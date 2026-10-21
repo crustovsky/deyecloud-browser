@@ -1,0 +1,76 @@
+---
+import Base from "../layouts/Base.astro";
+import Flow from "../components/Flow.astro";
+---
+<Base title="Live" current="live">
+  <h1>Live <span class="muted small" id="updated"></span></h1>
+  <div class="toolbar">
+    <button id="fetch">Fetch now</button>
+    <span class="muted small" id="fetch-info">Data arrives every 5 minutes on its own.</span>
+  </div>
+  <Flow />
+  <h2>Today</h2>
+  <div class="tiles" id="today"></div>
+</Base>
+
+<script>
+  import { api, kwh, timeAgo, type Daily, type Reading } from "../lib/api";
+
+  document.addEventListener("flow:latest", (e) => {
+    const r = (e as CustomEvent<Reading | null>).detail;
+    const el = document.getElementById("updated")!;
+    if (!r) {
+      el.textContent = "no data yet";
+      return;
+    }
+    const age = Math.floor(Date.now() / 1000) - r.ts;
+    el.textContent = `reading from ${timeAgo(r.ts)}`;
+    el.className = age > 20 * 60 ? "status-warn small" : "muted small";
+  });
+
+  function tile(label: string, value: string, unit = "kWh", sub = "") {
+    return `<div class="tile"><div class="label">${label}</div><div class="value">${value}<small>${unit}</small></div>${sub ? `<div class="sub">${sub}</div>` : ""}</div>`;
+  }
+
+  async function today() {
+    const { today } = await api<{ today: Daily | null }>("/api/latest");
+    const el = document.getElementById("today")!;
+    if (!today) {
+      el.innerHTML = `<p class="muted">No totals for today yet.</p>`;
+      return;
+    }
+    const imp = today.import_peak_kwh + today.import_offpeak_kwh;
+    el.innerHTML = [
+      tile("Solar", kwh(today.pv_kwh)),
+      tile("House", kwh(today.load_kwh)),
+      tile("Grid import", kwh(imp), "kWh", `peak ${kwh(today.import_peak_kwh)} · off-peak ${kwh(today.import_offpeak_kwh)}`),
+      tile("Grid export", kwh(today.export_kwh)),
+      tile("Battery", kwh(today.batt_discharge_kwh), "kWh out", `charged ${kwh(today.batt_charge_kwh)} kWh`),
+      tile("SOC range", today.soc_min == null ? "–" : `${Math.round(today.soc_min)}–${Math.round(today.soc_max ?? 0)}`, "%"),
+    ].join("");
+  }
+  today();
+  setInterval(today, 5 * 60_000);
+
+  // Asks the Worker to pull from Deye right away. The Worker refuses if a run
+  // finished under a minute ago, and the logger only uploads every 5 minutes anyway.
+  const fetchBtn = document.getElementById("fetch") as HTMLButtonElement;
+  const fetchInfo = document.getElementById("fetch-info")!;
+  fetchBtn.addEventListener("click", async () => {
+    fetchBtn.disabled = true;
+    fetchInfo.textContent = "Fetching from Deye Cloud…";
+    try {
+      const res = await fetch("/api/ingest?chunks=3", { method: "POST", credentials: "same-origin" });
+      const r = await res.json();
+      if (r.skipped) fetchInfo.textContent = `Skipped: ${r.skipped}.`;
+      else if (r.error) fetchInfo.textContent = `Failed: ${r.error}`;
+      else fetchInfo.textContent = `Fetched ${r.rows} readings${r.caughtUp === false ? ", backfill still catching up" : ""}.`;
+      document.dispatchEvent(new Event("flow:refresh"));
+      today();
+    } catch (e) {
+      fetchInfo.textContent = `Failed: ${e instanceof Error ? e.message : e}`;
+    } finally {
+      fetchBtn.disabled = false;
+    }
+  });
+</script>

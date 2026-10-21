@@ -1,0 +1,123 @@
+---
+import Base from "../layouts/Base.astro";
+---
+<Base title="Day" current="day">
+  <h1>Day</h1>
+  <div class="toolbar">
+    <button id="prev" title="Previous day">‹</button>
+    <input type="date" id="date" />
+    <button id="next" title="Next day">›</button>
+    <button id="today">Today</button>
+    <span class="muted small" id="info"></span>
+  </div>
+  <div class="card">
+    <div class="legend">
+      <span style="--c: var(--pv)">Solar</span>
+      <span style="--c: var(--load)">House</span>
+      <span style="--c: var(--grid)">Grid (+ import, − export)</span>
+      <span style="--c: var(--battery)">Battery (+ discharge, − charge)</span>
+      <span style="--c: var(--peak-shade); outline: 1px solid var(--border)">Peak tariff hours</span>
+    </div>
+    <div id="power"></div>
+    <div id="soc" style="margin-top: 6px"></div>
+  </div>
+  <div class="tiles" id="totals"></div>
+</Base>
+
+<script>
+  import { api, addDays, cssVar, kwh, qs, setQs, todayIn, type AppConfig, type Daily, type Reading } from "../lib/api";
+  import { uPlot, axisStyle, fitWidth, tzDate, zoneShading, type Segment } from "../lib/charts";
+
+  interface DayResponse { day: string; start: number; end: number; rows: Reading[]; daily: Daily | null; zones: Segment[] }
+
+  const cfg = await api<AppConfig>("/api/config");
+  const dateEl = document.getElementById("date") as HTMLInputElement;
+  const powerEl = document.getElementById("power")!;
+  const socEl = document.getElementById("soc")!;
+  let segments: Segment[] = [];
+
+  const series = (label: string, color: string, extra: Partial<uPlot.Series> = {}): uPlot.Series => ({
+    label,
+    stroke: cssVar(color),
+    width: 2,
+    spanGaps: false,
+    value: (_u, v) => (v == null ? "–" : `${v.toFixed(2)} kW`),
+    ...extra,
+  });
+
+  const base = (height: number): uPlot.Options => ({
+    width: powerEl.clientWidth,
+    height,
+    tzDate: tzDate(cfg.timezone),
+    cursor: { sync: { key: "day" }, points: { size: 8 } },
+    legend: { live: true },
+    axes: [axisStyle(), { ...axisStyle(), size: 54 }],
+    scales: { x: { time: true } },
+    series: [{ label: "Time", value: (_u, v) => (v == null ? "" : uPlot.fmtDate("{HH}:{mm}")(tzDate(cfg.timezone)(v))) }],
+    plugins: [zoneShading(() => segments)],
+  });
+
+  const power = new uPlot(
+    {
+      ...base(320),
+      series: [
+        ...base(0).series,
+        series("Solar", "--pv"),
+        series("House", "--load"),
+        series("Grid", "--grid"),
+        series("Battery", "--battery"),
+      ],
+      axes: [axisStyle(), { ...axisStyle(), size: 54, values: (_u, vals) => vals.map((v) => `${v} kW`) }],
+    },
+    [[], [], [], [], []],
+    powerEl,
+  );
+
+  const soc = new uPlot(
+    {
+      ...base(130),
+      series: [...base(0).series, series("SOC", "--soc", { value: (_u, v) => (v == null ? "–" : `${v.toFixed(0)} %`), fill: cssVar("--soc") + "22" })],
+      axes: [axisStyle(), { ...axisStyle(), size: 54, values: (_u, vals) => vals.map((v) => `${v} %`) }],
+      scales: { x: { time: true }, y: { range: [0, 100] } },
+    },
+    [[], []],
+    socEl,
+  );
+  fitWidth(powerEl, [power, soc]);
+
+  function tile(label: string, value: string, sub = "") {
+    return `<div class="tile"><div class="label">${label}</div><div class="value">${value}<small>kWh</small></div>${sub ? `<div class="sub">${sub}</div>` : ""}</div>`;
+  }
+
+  async function load(day: string) {
+    setQs({ date: day });
+    dateEl.value = day;
+    const d = await api<DayResponse>(`/api/day?date=${day}`);
+    segments = d.zones;
+    const ts = d.rows.map((r) => r.ts);
+    power.setData([ts, d.rows.map((r) => r.pv_kw), d.rows.map((r) => r.load_kw), d.rows.map((r) => r.grid_kw), d.rows.map((r) => r.battery_kw)]);
+    soc.setData([ts, d.rows.map((r) => r.soc)]);
+    power.setScale("x", { min: d.start, max: d.end });
+    soc.setScale("x", { min: d.start, max: d.end });
+
+    document.getElementById("info")!.textContent = d.rows.length ? `${d.rows.length} samples` : "no data for this day";
+    const t = d.daily;
+    document.getElementById("totals")!.innerHTML = t
+      ? [
+          tile("Solar", kwh(t.pv_kwh)),
+          tile("House", kwh(t.load_kwh)),
+          tile("Import", kwh(t.import_peak_kwh + t.import_offpeak_kwh), `peak ${kwh(t.import_peak_kwh)} · off-peak ${kwh(t.import_offpeak_kwh)}`),
+          tile("Export", kwh(t.export_kwh)),
+          tile("Battery out", kwh(t.batt_discharge_kwh), `in ${kwh(t.batt_charge_kwh)} kWh`),
+        ].join("")
+      : "";
+  }
+
+  const today = todayIn(cfg.timezone);
+  dateEl.max = today;
+  dateEl.addEventListener("change", () => dateEl.value && load(dateEl.value));
+  document.getElementById("prev")!.addEventListener("click", () => load(addDays(dateEl.value, -1)));
+  document.getElementById("next")!.addEventListener("click", () => load(addDays(dateEl.value, 1)));
+  document.getElementById("today")!.addEventListener("click", () => load(today));
+  load(qs("date") ?? today);
+</script>

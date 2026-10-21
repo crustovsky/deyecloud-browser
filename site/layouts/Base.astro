@@ -1,0 +1,57 @@
+---
+import "../styles/global.css";
+interface Props { title: string; current: string }
+const { title, current } = Astro.props;
+const links = [
+  ["live", "/", "Live"],
+  ["day", "/day", "Day"],
+  ["days", "/days", "Totals"],
+  ["battery", "/battery", "Battery"],
+];
+---
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{title}</title>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23eda100' stroke-width='2'%3E%3Ccircle cx='12' cy='12' r='4'/%3E%3Cpath d='M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1'/%3E%3C/svg%3E" />
+  </head>
+  <body>
+    <header class="top">
+      <div class="wrap">
+        <a class="brand" href="/" id="brand">Energy</a>
+        <nav>
+          {links.map(([key, href, label]) => (
+            <a href={href} aria-current={key === current ? "page" : undefined}>{label}</a>
+          ))}
+        </nav>
+      </div>
+    </header>
+    <main class="wrap">
+      <slot />
+    </main>
+    <footer class="bottom wrap" id="foot"></footer>
+    <script>
+      import { api, timeAgo } from "../lib/api";
+      api("/api/config").then((c: any) => {
+        if (c.title) {
+          document.getElementById("brand")!.textContent = c.title;
+          document.title = `${c.title} · ${document.title}`;
+        }
+      }).catch(() => {});
+      api("/api/status").then((s: any) => {
+        const foot = document.getElementById("foot")!;
+        const lr = s.lastRun;
+        const parts: string[] = [];
+        if (s.cursor) parts.push(`Data fetched ${timeAgo(s.cursor, s.now)}`);
+        if (lr?.error) parts.push(`last run failed: ${lr.error}`);
+        if (lr?.caughtUp === false) parts.push("backfill in progress");
+        if (s.backoffUntil) parts.push(`paused until ${new Date(s.backoffUntil * 1000).toLocaleTimeString()}`);
+        const today = Object.keys(s.apiCalls ?? {}).sort().pop();
+        if (today) parts.push(`${s.apiCalls[today]} API calls today`);
+        foot.textContent = parts.join(" · ");
+      }).catch(() => {});
+    </script>
+  </body>
+</html>

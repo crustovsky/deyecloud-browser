@@ -1,0 +1,59 @@
+{
+  "name": "deyecloud-browser",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "astro build",
+    "dev": "astro build && wrangler dev",
+    "deploy": "astro build && wrangler deploy",
+    "types": "wrangler types",
+    "check": "astro check && tsc -p worker/tsconfig.json",
+    "test": "vitest run",
+    "probe": "node scripts/probe.mjs"
+  },
+  "dependencies": {
+    "astro": "^5.18.2",
+    "uplot": "^1.6.32"
+  },
+  "devDependencies": {
+    "@astrojs/check": "^0.9.4",
+    "typescript": "^5.9.3",
+    "vitest": "^3.2.7",
+    "wrangler": "^4.151.3"
+  },
+  "cloudflare": {
+    "bindings": {
+      "DB": {
+        "description": "D1 database that stores the 5 minute readings and daily totals. Created automatically."
+      },
+      "ALLOW_PUBLIC": {
+        "description": "Leave as `false`. The dashboard only serves visitors authenticated by **Cloudflare Access**; enable Access on the Worker after deploying. Set to `true` only if you want your energy data public."
+      },
+      "SITE_TITLE": {
+        "description": "Name shown in the top bar, e.g. your house or plant name. Empty uses the plant name from Deye Cloud."
+      },
+      "DEYE_BASE_URL": {
+        "description": "Deye Cloud OpenAPI host for your region. EU: https://eu1-developer.deyecloud.com"
+      },
+      "DEYE_POWER_UNIT": {
+        "description": "Unit of the power values the API returns, `W` or `kW`. Check /api/status after the first fetch: if PV reads 1000x too big or small, flip this."
+      },
+      "STATION_NAME": {
+        "description": "Name of the plant in Deye Cloud, only needed if your account has more than one. Empty picks the first."
+      },
+      "BACKFILL_FROM": {
+        "description": "First day to fetch history from, YYYY-MM-DD in your timezone. Empty means the last 30 days."
+      },
+      "TIMEZONE": {
+        "description": "IANA timezone of the plant, used for day boundaries and tariff zones, e.g. Europe/Warsaw."
+      },
+      "OFFPEAK_HOURS": {
+        "description": "Cheap tariff hours as `start-end` ranges in local time, comma separated, e.g. `22-6,13-15`. Empty means a flat tariff."
+      },
+      "GAUGE_PV_KW": { "description": "Full-scale value of the PV gauge on the flow page, usually the array size in kWp." },
+      "GAUGE_GRID_KW": { "description": "Full-scale value of the grid gauge, e.g. the inverter rating in kW." },
+      "GAUGE_BATTERY_KW": { "description": "Full-scale value of the battery gauge, e.g. max charge/discharge power in kW." },
+      "GAUGE_LOAD_KW": { "description": "Full-scale value of the house load gauge in kW." }
+    }
+  }
+}

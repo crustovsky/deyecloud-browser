@@ -106,6 +106,8 @@ npm run probe
 
 It makes four read-only API calls and prints the raw station list, latest data and a few history frames, with notes on what to look for. The dashboard uses: grid positive = import, battery positive = discharging, matching the Deye web export.
 
+On the inverters checked so far the API returns watts, `batteryPower` signed (negative while charging), and only the grid magnitude: `gridPower` is null and `purchasePower` equals `wirePower` in every frame. The Worker therefore takes the grid direction from the power balance (house load minus PV minus battery), which is exact apart from the inverter's own losses of around 100 W.
+
 After changing `DEYE_POWER_UNIT` or `BACKFILL_FROM`, delete the cursor to fetch again:
 
 ```sh
@@ -139,7 +141,7 @@ Deye Cloud OpenAPI  <--  Worker (cron every 5 min)  -->  D1 (readings, daily, me
 - Every endpoint is a POST with a JSON body and a `Bearer` token. Tokens last about 60 days and are cached in D1.
 - Errors arrive as HTTP 200 with `{ "success": false, "code": "...", "msg": "..." }`, so the client checks `success` on every response.
 - `station/history/power` takes unix second timestamps, allows up to 12 months per call, and returns 5 minute frames with generation, consumption, grid, purchase, wire (feed-in), battery, charge, discharge and SOC fields.
-- The spec does not state units, sign conventions or the timestamp format, hence the probe script. The client prefers the unsigned purchase/wire and charge/discharge pairs over the signed fields, and parses seconds, milliseconds and date strings.
+- The spec does not state units, sign conventions or the timestamp format, hence the probe script. Observed: watts, unix seconds, signed `batteryPower`, grid magnitude only (see above). The client also accepts kW, milliseconds, date strings and a signed `gridPower` should another firmware send them.
 
 **API** (same origin, behind Access): `GET /api/config`, `GET /api/status`, `GET /api/latest`, `GET /api/day?date=YYYY-MM-DD`, `GET /api/daily?from=&to=`, `POST /api/ingest?chunks=` (at most once a minute), `POST /api/rollup?from=&to=`.
 

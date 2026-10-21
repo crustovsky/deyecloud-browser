@@ -56,22 +56,35 @@ describe("rollupDay", () => {
 });
 
 describe("toReading", () => {
-  it("converts watts and prefers unsigned pairs", () => {
+  // Real frames from a Deye hybrid inverter: watts, signed batteryPower, grid magnitude only.
+  it("night grid charging: import, battery charging", () => {
     const r = toReading(
-      { timeStamp: 1760000000, generationPower: 1500, consumptionPower: 700, purchasePower: 0, wirePower: 800, chargePower: 600, dischargePower: 0, batterySOC: 77 },
+      { timeStamp: 1792616700, generationPower: 0, consumptionPower: 121, gridPower: null, purchasePower: 2798, wirePower: 2798, batteryPower: -2580, chargePower: -2580, dischargePower: null, batterySOC: 83 },
       "W",
     )!;
-    expect(r.pv_kw).toBeCloseTo(1.5);
-    expect(r.load_kw).toBeCloseTo(0.7);
-    expect(r.grid_kw).toBeCloseTo(-0.8);
-    expect(r.battery_kw).toBeCloseTo(-0.6);
-    expect(r.soc).toBe(77);
+    expect(r.pv_kw).toBe(0);
+    expect(r.load_kw).toBeCloseTo(0.121);
+    expect(r.grid_kw).toBeCloseTo(2.798);
+    expect(r.battery_kw).toBeCloseTo(-2.58);
+    expect(r.soc).toBe(83);
   });
-  it("falls back to signed fields and kW unit", () => {
-    const r = toReading({ timeStamp: "1760000000000", gridPower: 1.2, batteryPower: -0.5 }, "kW")!;
+  it("evening: battery discharging covers the load", () => {
+    const r = toReading(
+      { timeStamp: 1792608600, generationPower: 0, consumptionPower: 48, purchasePower: 14, wirePower: 14, batteryPower: 129, dischargePower: 129, batterySOC: 48 },
+      "W",
+    )!;
+    expect(r.battery_kw).toBeCloseTo(0.129);
+    expect(r.grid_kw).toBeCloseTo(-0.014); // surplus after losses, counted as export
+  });
+  it("sunny day with a full battery: export", () => {
+    const r = toReading({ timeStamp: 1792600000, generationPower: 4200, consumptionPower: 600, purchasePower: 3500, wirePower: 3500, batteryPower: 0, batterySOC: 100 }, "W")!;
+    expect(r.grid_kw).toBeCloseTo(-3.5);
+  });
+  it("falls back to signed grid, charge/discharge pair and kW unit", () => {
+    const r = toReading({ timeStamp: "1760000000000", gridPower: -1.2, chargePower: -0.5, dischargePower: null }, "kW")!;
     expect(r.ts).toBe(1760000000);
-    expect(r.grid_kw).toBeCloseTo(1.2);
     expect(r.battery_kw).toBeCloseTo(-0.5);
+    expect(r.grid_kw).toBeCloseTo(1.2); // load 0, pv 0, battery charging 0.5 -> net positive -> import
   });
   it("drops empty frames and bad timestamps", () => {
     expect(toReading({ timeStamp: 1760000000 }, "W")).toBeNull();

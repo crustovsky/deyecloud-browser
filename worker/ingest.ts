@@ -143,8 +143,14 @@ export function parseTs(v: unknown): number | null {
 
 // Maps one API frame onto our sign conventions:
 // grid positive = import, battery positive = discharging.
-// Prefers the unsigned purchase/wire and charge/discharge pairs; falls back to the
-// signed fields assuming the Deye export convention. Confirm with `npm run probe`.
+//
+// What the plant API actually returns (checked against a real hybrid inverter):
+// - batteryPower is signed, positive while discharging; chargePower is reported negative.
+// - gridPower is null and purchasePower equals wirePower in every frame, so the API only
+//   gives the grid magnitude. The direction comes from the power balance: whatever the
+//   house uses beyond what PV and the battery supply must come from the grid, and any
+//   surplus must go out. Inverter losses (about 100 W) bias this toward import, which
+//   only misclassifies exports smaller than that.
 export function toReading(item: StationPowerItem, unit: "W" | "kW"): Reading | null {
   const ts = parseTs(item.timeStamp);
   if (ts == null) return null;
@@ -154,22 +160,21 @@ export function toReading(item: StationPowerItem, unit: "W" | "kW"): Reading | n
     return n == null ? null : n * k;
   };
 
-  const purchase = scale(item.purchasePower);
-  const wire = scale(item.wirePower);
-  const grid = purchase != null || wire != null ? (purchase ?? 0) - (wire ?? 0) : scale(item.gridPower);
+  const pv = scale(item.generationPower);
+  const load = scale(item.consumptionPower);
 
   const charge = scale(item.chargePower);
   const discharge = scale(item.dischargePower);
-  const battery = charge != null || discharge != null ? (discharge ?? 0) - (charge ?? 0) : scale(item.batteryPower);
+  const battery = scale(item.batteryPower) ?? (charge == null && discharge == null ? null : (discharge ?? 0) - Math.abs(charge ?? 0));
 
-  const r: Reading = {
-    ts,
-    pv_kw: scale(item.generationPower),
-    load_kw: scale(item.consumptionPower),
-    grid_kw: grid,
-    battery_kw: battery,
-    soc: num(item.batterySOC),
-  };
+  const gridMag = scale(item.gridPower) ?? scale(item.purchasePower) ?? scale(item.wirePower);
+  let grid: number | null = null;
+  if (gridMag != null) {
+    const net = (load ?? 0) - (pv ?? 0) - (battery ?? 0);
+    grid = net >= 0 ? Math.abs(gridMag) : -Math.abs(gridMag);
+  }
+
+  const r: Reading = { ts, pv_kw: pv, load_kw: load, grid_kw: grid, battery_kw: battery, soc: num(item.batterySOC) };
   const empty = r.pv_kw == null && r.load_kw == null && r.grid_kw == null && r.battery_kw == null && r.soc == null;
   return empty ? null : r;
 }

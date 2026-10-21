@@ -66,8 +66,9 @@ console.log(JSON.stringify(hist, null, 2));
 
 console.log(`
 Check:
-  1. generationPower during daylight: hundreds to thousands means W (DEYE_POWER_UNIT=W), single digits means kW.
-  2. purchasePower / wirePower and chargePower / dischargePower present and non-negative? Then signs are handled.
-     If only gridPower / batteryPower exist, note their sign while importing or charging and compare with the dashboard.
-  3. timeStamp: unix seconds, milliseconds, or a date string? All three are parsed; a string without a timezone is read as UTC.
-  4. regionTimezone of the station should match the TIMEZONE variable.`);
+  1. generationPower / consumptionPower during the day: hundreds to thousands means W (DEYE_POWER_UNIT=W), single digits means kW.
+  2. batteryPower should be negative while charging and positive while discharging. If it is the other way round, open an issue.
+  3. gridPower is usually null and purchasePower equals wirePower: the API only reports the grid magnitude.
+     The dashboard derives the direction from the power balance, so this is expected.
+  4. timeStamp: unix seconds, milliseconds or a date string are all handled.
+  5. regionTimezone of the station should match the TIMEZONE variable (Deye sometimes stores a neighbouring zone, use yours).`);

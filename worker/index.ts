@@ -2,6 +2,7 @@ import { handleApi } from "./api";
 import { loadConfig } from "./config";
 import { runIngest } from "./ingest";
 import { ensureSchema } from "./schema";
+import { serveSite } from "./site";
 
 const CRON_CHUNKS = 6;
 
@@ -26,7 +27,7 @@ export default {
         });
       }
     }
-    return env.ASSETS.fetch(request);
+    return serveSite(request);
   },
 
   async scheduled(_controller, env): Promise<void> {

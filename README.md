@@ -143,6 +143,8 @@ Deye Cloud OpenAPI  <--  Worker (cron every 5 min)  -->  D1 (readings, daily, me
 - `station/history/power` takes unix second timestamps, allows up to 12 months per call, and returns 5 minute frames with generation, consumption, grid, purchase, wire (feed-in), battery, charge, discharge and SOC fields.
 - The spec does not state units, sign conventions or the timestamp format, hence the probe script. Observed: watts, unix seconds, signed `batteryPower`, grid magnitude only (see above). The client also accepts kW, milliseconds, date strings and a signed `gridPower` should another firmware send them.
 
+**Pages.** The Astro build is embedded in the Worker bundle rather than served through Workers static assets. Workers with static assets run behind a router that does not pass the Access identity to the Worker, which would defeat the private-by-default check. The whole site is about 100 KB, so shipping it inside the Worker costs nothing.
+
 **API** (same origin, behind Access): `GET /api/config`, `GET /api/status`, `GET /api/latest`, `GET /api/day?date=YYYY-MM-DD`, `GET /api/daily?from=&to=`, `POST /api/ingest?chunks=` (at most once a minute), `POST /api/rollup?from=&to=`.
 
 **Storage.** Three D1 tables: `readings` (one row per 5 minute frame: ts, pv_kw, load_kw, grid_kw, battery_kw, soc), `daily` (per local day: energy totals, import split by zone, SOC range, sample count), `meta` (cursor, token, station, last run, counters). A year of readings is about 105,000 rows, far inside the free D1 tier.

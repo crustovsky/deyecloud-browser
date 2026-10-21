@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "astro build",
+    "build": "astro build && node scripts/bundle-site.mjs",
     "dev": "astro build && node scripts/wrangler.mjs dev",
     "deploy": "astro build && node scripts/wrangler.mjs deploy",
     "wrangler": "node scripts/wrangler.mjs",

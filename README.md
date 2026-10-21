@@ -43,7 +43,7 @@ After the deploy:
 
 1. Add the four secrets under the Worker's **Settings → Variables and Secrets**: `DEYE_APP_ID`, `DEYE_APP_SECRET`, `DEYE_EMAIL`, `DEYE_PASSWORD`.
 2. [Turn on Cloudflare Access](#turn-on-cloudflare-access). Until you do, the Worker only shows a "This dashboard is private" page.
-3. Wait for the cron, which runs every 5 minutes. The first runs backfill history from `BACKFILL_FROM` at six days per run; the footer shows progress.
+3. Wait for the cron, which runs every 5 minutes. The first runs backfill history from `BACKFILL_FROM`; see [How long the first fill takes](#how-long-the-first-fill-takes).
 
 ### Manually
 
@@ -64,6 +64,18 @@ npm run deploy
 
 The Worker creates its tables on first use; there is no migration step.
 
+### How long the first fill takes
+
+Each cron run fetches six days of history, one day per API call with a short pause between calls, and the cron fires every 5 minutes. So the backfill advances about six days every 5 minutes:
+
+| History to fetch | Time until live |
+| ---------------- | --------------- |
+| 30 days (the default) | about 25 minutes |
+| 3 months | about 1 hour 20 minutes |
+| 1 year | about 5 hours |
+
+Until it catches up, the Live page shows the newest frame fetched so far ("reading from 12 d ago") and the footer says "backfill in progress". The **Fetch now** button pulls three more days per press, at most once a minute. From the command line, `POST /api/ingest?chunks=30` pulls thirty days in one go (through Access you need a [service token](https://developers.cloudflare.com/cloudflare-one/identity/service-tokens/) or a browser session). The whole fill costs one API call per day of history plus one for the token, well inside Deye's limits.
+
 ## Turn on Cloudflare Access
 
 1. In the dashboard go to **Workers & Pages** and select the Worker.
@@ -72,7 +84,14 @@ The Worker creates its tables on first use; there is no migration step.
 4. Under **Authentication policy**, choose who may sign in: your Cloudflare account members, specific emails, or an email domain.
 5. Select **Apply Access**.
 
-This protects every address the Worker answers on. A custom domain can be added in the Worker's **Domains** tab. If you really want a public dashboard, set `ALLOW_PUBLIC` to `true`.
+This protects every address the Worker answers on, including custom domains. To use your own domain, add it in the Worker's **Domains** tab, or put it in your `wrangler.local.jsonc` and turn the `workers.dev` address off so there is a single way in:
+
+```jsonc
+"workers_dev": false,
+"routes": [{ "pattern": "energy.example.com", "custom_domain": true }]
+```
+
+If you really want a public dashboard, set `ALLOW_PUBLIC` to `true`.
 
 ## Configuration
 

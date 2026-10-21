@@ -4,9 +4,10 @@
   "type": "module",
   "scripts": {
     "build": "astro build",
-    "dev": "astro build && wrangler dev",
-    "deploy": "astro build && wrangler deploy",
-    "types": "wrangler types",
+    "dev": "astro build && node scripts/wrangler.mjs dev",
+    "deploy": "astro build && node scripts/wrangler.mjs deploy",
+    "wrangler": "node scripts/wrangler.mjs",
+    "types": "node scripts/wrangler.mjs types",
     "check": "astro check && tsc -p worker/tsconfig.json",
     "test": "vitest run",
     "probe": "node scripts/probe.mjs"
@@ -50,10 +51,18 @@
       "OFFPEAK_HOURS": {
         "description": "Cheap tariff hours as `start-end` ranges in local time, comma separated, e.g. `22-6,13-15`. Empty means a flat tariff."
       },
-      "GAUGE_PV_KW": { "description": "Full-scale value of the PV gauge on the flow page, usually the array size in kWp." },
-      "GAUGE_GRID_KW": { "description": "Full-scale value of the grid gauge, e.g. the inverter rating in kW." },
-      "GAUGE_BATTERY_KW": { "description": "Full-scale value of the battery gauge, e.g. max charge/discharge power in kW." },
-      "GAUGE_LOAD_KW": { "description": "Full-scale value of the house load gauge in kW." }
+      "GAUGE_PV_KW": {
+        "description": "Full-scale value of the PV gauge on the flow page, usually the array size in kWp."
+      },
+      "GAUGE_GRID_KW": {
+        "description": "Full-scale value of the grid gauge, e.g. the inverter rating in kW."
+      },
+      "GAUGE_BATTERY_KW": {
+        "description": "Full-scale value of the battery gauge, e.g. max charge/discharge power in kW."
+      },
+      "GAUGE_LOAD_KW": {
+        "description": "Full-scale value of the house load gauge in kW."
+      }
     }
   }
 }

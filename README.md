@@ -51,13 +51,16 @@ After the deploy:
 git clone https://github.com/crustovsky/deyecloud-browser && cd deyecloud-browser
 npm install
 npx wrangler login
-npx wrangler d1 create deyecloud-browser     # paste the database_id into wrangler.jsonc
-npx wrangler secret put DEYE_APP_ID
-npx wrangler secret put DEYE_APP_SECRET
-npx wrangler secret put DEYE_EMAIL
-npx wrangler secret put DEYE_PASSWORD
+cp wrangler.jsonc wrangler.local.jsonc       # your copy, ignored by git
+npx wrangler d1 create deyecloud-browser     # paste the database_id into wrangler.local.jsonc
+npm run wrangler secret put DEYE_APP_ID
+npm run wrangler secret put DEYE_APP_SECRET
+npm run wrangler secret put DEYE_EMAIL
+npm run wrangler secret put DEYE_PASSWORD
 npm run deploy
 ```
+
+`wrangler.local.jsonc` is where your own settings go: the database id, `SITE_TITLE`, `BACKFILL_FROM`, a custom domain, `workers_dev: false`, anything. Every npm script uses it when it exists and falls back to the committed `wrangler.jsonc` otherwise, so your values never have to be pushed. `npm run wrangler <args>` runs any wrangler command against the same file.
 
 The Worker creates its tables on first use; there is no migration step.
 
@@ -73,7 +76,7 @@ This protects every address the Worker answers on. A custom domain can be added 
 
 ## Configuration
 
-Variables in `wrangler.jsonc` (or the Worker's **Settings → Variables**):
+Variables in `wrangler.jsonc`, in your `wrangler.local.jsonc`, or on the Worker's **Settings → Variables** page:
 
 | Variable           | Default                               | Meaning |
 | ------------------ | ------------------------------------- | ------- |
@@ -90,14 +93,14 @@ Variables in `wrangler.jsonc` (or the Worker's **Settings → Variables**):
 | `GAUGE_BATTERY_KW` | `5`                                   | Full scale of the battery gauge. |
 | `GAUGE_LOAD_KW`    | `12`                                  | Full scale of the house gauge. |
 
-Secrets: `DEYE_APP_ID`, `DEYE_APP_SECRET`, `DEYE_EMAIL`, `DEYE_PASSWORD`.
+Secrets: `DEYE_APP_ID`, `DEYE_APP_SECRET`, `DEYE_EMAIL`, `DEYE_PASSWORD`. They live on the deployed Worker (`wrangler secret put` or the dashboard). The same four names in a local `.dev.vars` file serve only `npm run dev` and `npm run probe` on your machine and are never uploaded.
 
 ### Checking units and signs
 
 Deye's API documentation does not state units or sign conventions. Before trusting the totals, run the probe once from your machine:
 
 ```sh
-cp .dev.vars.example .dev.vars    # fill in the four secrets
+cp .dev.vars.example .dev.vars    # fill in the four secrets (or export them in your shell)
 npm run probe
 ```
 

@@ -1,3 +1,4 @@
+import { WorkerEntrypoint } from "cloudflare:workers";
 import { handleApi } from "./api";
 import { loadConfig } from "./config";
 import { runIngest } from "./ingest";
@@ -37,6 +38,22 @@ export default {
     console.log(JSON.stringify({ message: "ingest", ...result }));
   },
 } satisfies ExportedHandler<Env>;
+
+// Read-only JSON API for other Workers in this account (the home dashboard),
+// reached over a service binding with `entrypoint = "Internal"`. Named
+// entrypoints are never exposed on a route, so the Access gate above does not
+// apply here. GET /api/* only; ingest and rollup stay behind the default export.
+export class Internal extends WorkerEntrypoint<Env> {
+  async fetch(request: Request): Promise<Response> {
+    const url = new URL(request.url);
+    if (request.method !== "GET" || !url.pathname.startsWith("/api/")) {
+      return new Response("Not found", { status: 404 });
+    }
+    const cfg = loadConfig(this.env);
+    await ensureSchema(this.env.DB);
+    return handleApi(request, this.env, cfg);
+  }
+}
 
 function accessRequired(): Response {
   const html = `<!doctype html>

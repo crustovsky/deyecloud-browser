@@ -58,7 +58,8 @@ header.top nav a { padding: 6px 10px; border-radius: 6px; color: var(--text-2); 
 header.top nav a:hover { background: var(--track); text-decoration: none; }
 header.top nav a[aria-current="page"] { color: var(--text); background: var(--track); }
 main.wrap { padding-top: 20px; padding-bottom: 40px; }
-footer.bottom { color: var(--text-3); font-size: 0.85rem; padding: 12px 0 24px; }
+footer.bottom { color: var(--text-3); font-size: 0.85rem; padding: 12px 0 24px; display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+footer.bottom .version { font-family: ui-monospace, monospace; opacity: 0.7; }
 
 h1 { font-size: 1.35rem; font-weight: 650; margin: 0 0 12px; }
 h2 { font-size: 1.05rem; font-weight: 600; margin: 24px 0 8px; color: var(--text-2); }

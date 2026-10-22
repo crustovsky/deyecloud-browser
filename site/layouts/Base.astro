@@ -2,6 +2,7 @@
 import "../styles/global.css";
 interface Props { title: string; current: string }
 const { title, current } = Astro.props;
+const version = import.meta.env.BUILD_VERSION; // set in astro.config.mjs
 const links = [
   ["live", "/", "Live"],
   ["day", "/day", "Day"],
@@ -31,7 +32,10 @@ const links = [
     <main class="wrap">
       <slot />
     </main>
-    <footer class="bottom wrap" id="foot"></footer>
+    <footer class="bottom wrap">
+      <span id="foot"></span>
+      <span class="version" title="build">{version}</span>
+    </footer>
     <script>
       import { api, timeAgo } from "../lib/api";
       api("/api/config").then((c: any) => {

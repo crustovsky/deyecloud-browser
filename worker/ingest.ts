@@ -1,6 +1,8 @@
 // One ingest function for cron, manual trigger and backfill.
 // A cursor in meta marks how far history has been fetched. Each run walks the
-// cursor forward in day-sized chunks (with a 15 minute overlap) until it reaches now.
+// cursor forward in day-sized chunks until it reaches now. Each chunk starts an hour
+// before the cursor so frames that Deye fills in late are still picked up; the overlap
+// costs nothing beyond re-upserting a few rows in the same call.
 
 import type { Config } from "./config";
 import { DeyeClient, DeyeHttpError, type StationItem, type StationPowerItem } from "./deye";
@@ -8,7 +10,7 @@ import { deleteMeta, getMeta, getMetaJson, setMeta } from "./meta";
 import { MAX_GAP_S, rollupDay, type Daily, type Reading } from "./rollup";
 import { addDays, dayEnd, dayStart, localDay } from "./time";
 
-const OVERLAP_S = 15 * 60;
+const OVERLAP_S = 60 * 60;
 const CHUNK_S = 24 * 3600;
 const CALL_SPACING_MS = 1500;
 const LOCK_TTL_S = 120;
@@ -24,6 +26,7 @@ export interface IngestResult {
   rows: number;
   days: string[];
   cursor?: number;
+  newest?: number; // timestamp of the newest frame seen in this run
   caughtUp?: boolean;
   error?: string;
 }
@@ -63,7 +66,10 @@ export async function runIngest(env: Env, cfg: Config, reason: string, maxChunks
       const readings = items.map((i) => toReading(i, cfg.powerUnit)).filter((r): r is Reading => r != null);
 
       await upsertReadings(db, readings);
-      for (const r of readings) touched.add(localDay(r.ts, cfg.tz));
+      for (const r of readings) {
+        touched.add(localDay(r.ts, cfg.tz));
+        if (result.newest == null || r.ts > result.newest) result.newest = r.ts;
+      }
       result.rows += readings.length;
       result.chunks++;
 

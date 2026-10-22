@@ -16,6 +16,7 @@ import Flow from "../components/Flow.astro";
 <script>
   import { api, kwh, timeAgo, type Daily, type Reading } from "../lib/api";
 
+  let newestTs: number | null = null;
   document.addEventListener("flow:latest", (e) => {
     const r = (e as CustomEvent<Reading | null>).detail;
     const el = document.getElementById("updated")!;
@@ -23,6 +24,7 @@ import Flow from "../components/Flow.astro";
       el.textContent = "no data yet";
       return;
     }
+    newestTs = r.ts;
     const age = Math.floor(Date.now() / 1000) - r.ts;
     el.textContent = `reading from ${timeAgo(r.ts)}`;
     el.className = age > 20 * 60 ? "status-warn small" : "muted small";
@@ -54,6 +56,8 @@ import Flow from "../components/Flow.astro";
 
   // Asks the Worker to pull from Deye right away. The Worker refuses if a run
   // finished under a minute ago, and the logger only uploads every 5 minutes anyway.
+  // The run always re-reads an overlap window, so the row count says nothing about
+  // freshness; compare the newest frame with what the page already had instead.
   const fetchBtn = document.getElementById("fetch") as HTMLButtonElement;
   const fetchInfo = document.getElementById("fetch-info")!;
   fetchBtn.addEventListener("click", async () => {
@@ -64,7 +68,9 @@ import Flow from "../components/Flow.astro";
       const r = await res.json();
       if (r.skipped) fetchInfo.textContent = `Skipped: ${r.skipped}.`;
       else if (r.error) fetchInfo.textContent = `Failed: ${r.error}`;
-      else fetchInfo.textContent = `Fetched ${r.rows} readings${r.caughtUp === false ? ", backfill still catching up" : ""}.`;
+      else if (r.newest == null || (newestTs != null && r.newest <= newestTs))
+        fetchInfo.textContent = `No newer data from Deye yet${r.newest ? `, newest reading ${timeAgo(r.newest)}` : ""}.`;
+      else fetchInfo.textContent = `Fetched, newest reading ${timeAgo(r.newest)}${r.caughtUp === false ? ", backfill still catching up" : ""}.`;
       document.dispatchEvent(new Event("flow:refresh"));
       today();
     } catch (e) {

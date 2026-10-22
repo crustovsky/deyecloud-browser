@@ -149,7 +149,7 @@ Deye Cloud OpenAPI  <--  Worker (cron every 5 min)  -->  D1 (readings, daily, me
                    static Astro pages + /api/* on one hostname, behind Access
 ```
 
-**Ingest.** One function serves the cron, the Fetch now button and the initial backfill. A cursor in the `meta` table records how far history has been fetched. Each run asks `station/history/power` for the window from 15 minutes before the cursor (so late-filled frames are caught) to at most one day ahead, upserts the frames on their timestamp, moves the cursor and repeats a few times. An empty database starts the cursor at `BACKFILL_FROM`. The same loop therefore handles the first fill, catching up after an outage and the normal 5 minute increment.
+**Ingest.** One function serves the cron, the Fetch now button and the initial backfill. A cursor in the `meta` table records how far history has been fetched. Each run asks `station/history/power` for the window from one hour before the cursor (so frames that Deye fills in late are caught) to at most one day ahead, upserts the frames on their timestamp, moves the cursor and repeats a few times. An empty database starts the cursor at `BACKFILL_FROM`. The same loop therefore handles the first fill, catching up after an outage and the normal 5 minute increment.
 
 **Daily totals.** Energy is integrated in the Worker from the 5 minute samples: kW × gap to the next sample, with gaps capped at 10 minutes so outages do not inflate totals. Each sample's tariff zone comes from its local hour in `TIMEZONE`, so daylight saving changes are handled. Totals are recomputed for every day a run touched.
 

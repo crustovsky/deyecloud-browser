@@ -4,8 +4,8 @@
   "type": "module",
   "scripts": {
     "build": "astro build && node scripts/bundle-site.mjs",
-    "dev": "astro build && node scripts/wrangler.mjs dev",
-    "deploy": "astro build && node scripts/wrangler.mjs deploy",
+    "dev": "npm run build && node scripts/wrangler.mjs dev",
+    "deploy": "npm run build && node scripts/wrangler.mjs deploy",
     "wrangler": "node scripts/wrangler.mjs",
     "types": "node scripts/wrangler.mjs types",
     "check": "astro check && tsc -p worker/tsconfig.json",

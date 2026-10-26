@@ -38,17 +38,13 @@ import Base from "../layouts/Base.astro";
 </Base>
 
 <script>
-  import { api, addDays, kwh, qs, setQs, todayIn, type AppConfig, type Daily } from "../lib/api";
+  import { api, addDays, duration, kwh, qs, setQs, todayIn, type AppConfig, type Daily } from "../lib/api";
   import { barChart } from "../lib/bars";
 
   const cfg = await api<AppConfig>("/api/config");
   const fromEl = document.getElementById("from") as HTMLInputElement;
   const toEl = document.getElementById("to") as HTMLInputElement;
   const today = todayIn(cfg.timezone);
-
-  function duration(min: number): string {
-    return min >= 60 ? `${Math.floor(min / 60)} h ${String(min % 60).padStart(2, "0")} min` : `${min} min`;
-  }
 
   function fillDays(from: string, to: string, rows: Daily[]): Daily[] {
     const byDay = new Map(rows.map((r) => [r.day, r]));

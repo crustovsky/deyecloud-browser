@@ -25,18 +25,23 @@ export interface Segment {
   zone: "peak" | "offpeak";
 }
 
-// Shades peak tariff hours behind the series.
-export function zoneShading(getSegments: () => Segment[]): uPlot.Plugin {
+export interface Band {
+  start: number;
+  end: number;
+  color: string;
+}
+
+// Fills vertical bands behind the series: peak tariff hours, missing data.
+export function shading(getBands: () => Band[]): uPlot.Plugin {
   return {
     hooks: {
       drawClear: (u) => {
         const { ctx, bbox } = u;
         ctx.save();
-        ctx.fillStyle = cssVar("--peak-shade");
-        for (const s of getSegments()) {
-          if (s.zone !== "peak") continue;
-          const x0 = Math.max(u.valToPos(s.start, "x", true), bbox.left);
-          const x1 = Math.min(u.valToPos(s.end, "x", true), bbox.left + bbox.width);
+        for (const b of getBands()) {
+          const x0 = Math.max(u.valToPos(b.start, "x", true), bbox.left);
+          const x1 = Math.min(u.valToPos(b.end, "x", true), bbox.left + bbox.width);
+          ctx.fillStyle = b.color;
           if (x1 > x0) ctx.fillRect(x0, bbox.top, x1 - x0, bbox.height);
         }
         ctx.restore();

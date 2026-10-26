@@ -46,6 +46,10 @@ import Base from "../layouts/Base.astro";
   const toEl = document.getElementById("to") as HTMLInputElement;
   const today = todayIn(cfg.timezone);
 
+  function duration(min: number): string {
+    return min >= 60 ? `${Math.floor(min / 60)} h ${String(min % 60).padStart(2, "0")} min` : `${min} min`;
+  }
+
   function fillDays(from: string, to: string, rows: Daily[]): Daily[] {
     const byDay = new Map(rows.map((r) => [r.day, r]));
     const out: Daily[] = [];
@@ -108,7 +112,7 @@ import Base from "../layouts/Base.astro";
       ["Batt in", (d) => kwh(d.batt_charge_kwh)],
       ["Batt out", (d) => kwh(d.batt_discharge_kwh)],
       ["SOC min", (d) => (d.soc_min == null ? "–" : `${Math.round(d.soc_min)}%`)],
-      ["Samples", (d) => String(d.samples ?? "")],
+      ["Missing", (d) => (d.missing_min ? duration(d.missing_min) : "–")],
     ];
     const totals = [
       kwh(sum((d) => d.pv_kwh)), kwh(sum((d) => d.load_kwh)), kwh(sum((d) => d.import_peak_kwh)), kwh(sum((d) => d.import_offpeak_kwh)),

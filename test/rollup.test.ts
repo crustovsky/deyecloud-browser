@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { parseHourRanges } from "../worker/config";
 import { parseTs, toReading } from "../worker/ingest";
-import { rollupDay, type Reading } from "../worker/rollup";
+import { findGaps, rollupDay, type Reading } from "../worker/rollup";
 import { dayStart } from "../worker/time";
 
 const cfg = { tz: "Europe/Warsaw", offpeak: parseHourRanges("22-6,13-15") };
@@ -45,6 +45,16 @@ describe("rollupDay", () => {
     expect(d.batt_discharge_kwh).toBeCloseTo(1 / 12, 6);
     expect(d.soc_min).toBe(40);
     expect(d.soc_max).toBe(55);
+  });
+
+  it("counts every sample of the 25 hour day when DST ends", () => {
+    const dst = "2026-10-25";
+    const s = dayStart(dst, cfg.tz);
+    const rows: Reading[] = [];
+    for (let t = s; t < s + 25 * 3600; t += 300) rows.push({ ...row(0, { pv_kw: 1 }), ts: t });
+    const d = rollupDay(dst, rows, cfg);
+    expect(d.samples).toBe(300);
+    expect(d.pv_kwh).toBeCloseTo(25, 6);
   });
 
   it("uses the first sample of the next day to close the last interval, but does not count it", () => {
@@ -95,5 +105,28 @@ describe("toReading", () => {
     expect(parseTs("1760000000000")).toBe(1760000000);
     expect(parseTs("2026-07-10T10:00:00Z")).toBe(Date.parse("2026-07-10T10:00:00Z") / 1000);
     expect(parseTs("nope")).toBeNull();
+  });
+});
+
+describe("findGaps", () => {
+  const end = start + 3600;
+  it("finds nothing in a complete hour", () => {
+    const rows = Array.from({ length: 12 }, (_, i) => row(i * 5, {}));
+    expect(findGaps(rows, start, end)).toEqual([]);
+  });
+  it("reports leading, middle and trailing gaps", () => {
+    const rows = [row(15, {}), row(20, {}), row(40, {})];
+    expect(findGaps(rows, start, end)).toEqual([
+      { start, end: start + 15 * 60 },
+      { start: start + 25 * 60, end: start + 40 * 60 },
+      { start: start + 45 * 60, end },
+    ]);
+  });
+  it("tolerates a single missing frame", () => {
+    const rows = [row(0, {}), row(10, {}), row(15, {})];
+    expect(findGaps(rows, start, start + 20 * 60)).toEqual([]);
+  });
+  it("whole range empty is one gap", () => {
+    expect(findGaps([], start, end)).toEqual([{ start, end }]);
   });
 });

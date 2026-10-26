@@ -80,3 +80,23 @@ export function rollupDay(day: string, rows: Reading[], cfg: Pick<Config, "tz" |
   }
   return d;
 }
+
+export interface Gap {
+  start: number;
+  end: number;
+}
+
+// Stretches of [start, end) longer than MAX_GAP_S with no sample: outages of the
+// logger, the inverter or Deye's cloud. `rows` must be sorted by ts ascending.
+export function findGaps(rows: Reading[], start: number, end: number): Gap[] {
+  const out: Gap[] = [];
+  let prev = start - NOMINAL_GAP_S;
+  for (const r of rows) {
+    if (r.ts < start) continue;
+    if (r.ts >= end) break;
+    if (r.ts - prev > MAX_GAP_S) out.push({ start: prev + NOMINAL_GAP_S, end: r.ts });
+    prev = r.ts;
+  }
+  if (end - prev > MAX_GAP_S) out.push({ start: prev + NOMINAL_GAP_S, end });
+  return out;
+}

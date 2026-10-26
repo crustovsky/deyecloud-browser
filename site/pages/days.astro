@@ -46,21 +46,12 @@ import Base from "../layouts/Base.astro";
   const toEl = document.getElementById("to") as HTMLInputElement;
   const today = todayIn(cfg.timezone);
 
-  function fillDays(from: string, to: string, rows: Daily[]): Daily[] {
-    const byDay = new Map(rows.map((r) => [r.day, r]));
-    const out: Daily[] = [];
-    for (let d = from; d <= to; d = addDays(d, 1)) {
-      out.push(byDay.get(d) ?? { day: d, pv_kwh: 0, load_kwh: 0, import_peak_kwh: 0, import_offpeak_kwh: 0, export_kwh: 0, batt_charge_kwh: 0, batt_discharge_kwh: 0, soc_min: null, soc_max: null, samples: 0 });
-    }
-    return out;
-  }
-
   async function load(from: string, to: string) {
     setQs({ from, to });
     fromEl.value = from;
     toEl.value = to;
-    const { rows } = await api<{ rows: Daily[] }>(`/api/daily?from=${from}&to=${to}`);
-    const days = fillDays(from, to, rows);
+    const { rows: days } = await api<{ rows: Daily[] }>(`/api/daily?from=${from}&to=${to}`); // one row per day
+    const rows = days.filter((d) => d.samples > 0);
     const labels = days.map((d) => d.day);
 
     barChart(document.getElementById("energy")!, {
@@ -116,7 +107,7 @@ import Base from "../layouts/Base.astro";
     ];
     document.getElementById("table")!.innerHTML =
       `<thead><tr><th>Day</th>${cols.map(([h]) => `<th>${h}</th>`).join("")}</tr></thead>` +
-      `<tbody>${[...rows].reverse().map((d) => `<tr><td><a href="/day?date=${d.day}">${d.day}</a></td>${cols.map(([, f]) => `<td>${f(d)}</td>`).join("")}</tr>`).join("")}</tbody>` +
+      `<tbody>${[...days].reverse().map((d) => `<tr><td><a href="/day?date=${d.day}">${d.day}</a></td>${cols.map(([, f]) => `<td>${f(d)}</td>`).join("")}</tr>`).join("")}</tbody>` +
       `<tfoot><tr><td>Total (kWh)</td>${totals.map((t) => `<td>${t}</td>`).join("")}</tr></tfoot>`;
   }
 

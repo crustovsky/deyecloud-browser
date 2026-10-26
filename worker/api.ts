@@ -3,7 +3,7 @@
 import type { Config } from "./config";
 import { allMeta, getMetaJson } from "./meta";
 import { lastRun, rollupAndStore, runIngest } from "./ingest";
-import { findGaps, type Daily, type Reading } from "./rollup";
+import { findGaps, MAX_GAP_S, type Daily, type Reading } from "./rollup";
 import { addDays, dayEnd, dayStart, isDay, localDay, zoneFor, type Zone } from "./time";
 
 const MANUAL_MIN_GAP_S = 60;
@@ -22,6 +22,8 @@ export async function handleApi(request: Request, env: Env, cfg: Config): Promis
   const path = url.pathname.replace(/\/+$/, "");
   const db = env.DB;
   const now = Math.floor(Date.now() / 1000);
+  // The newest frame is normally 5 to 10 minutes old; the minutes before now are not missing yet.
+  const live = now - MAX_GAP_S;
 
   if (request.method === "GET" && path === "/api/config") {
     const station = await getMetaJson<{ name?: string }>(db, "station");
@@ -73,7 +75,7 @@ export async function handleApi(request: Request, env: Env, cfg: Config): Promis
       .bind(start, end)
       .all<Reading>();
     const daily = await db.prepare("SELECT * FROM daily WHERE day = ?").bind(day).first();
-    const gaps = findGaps(results, start, Math.min(end, now));
+    const gaps = findGaps(results, start, Math.min(end, live));
     return json({ day, start, end, rows: results, daily, zones: zoneSegments(start, end, cfg), gaps });
   }
 
@@ -86,11 +88,15 @@ export async function handleApi(request: Request, env: Env, cfg: Config): Promis
       .prepare("SELECT * FROM daily WHERE day >= ? AND day <= ? ORDER BY day")
       .bind(from, to)
       .all<Daily>();
-    // Minutes of the day (so far) not covered by a 5 minute sample. DST days are 23 or 25 hours.
-    const rows = results.map((d) => {
-      const elapsed = Math.min(dayEnd(d.day, cfg.tz), now) - dayStart(d.day, cfg.tz);
-      return { ...d, missing_min: Math.max(0, Math.round(elapsed / 60) - d.samples * 5) };
-    });
+    // One row per day, days without any reading included, each with the minutes (so far)
+    // not covered by a 5 minute sample. DST days are 23 or 25 hours.
+    const byDay = new Map(results.map((d) => [d.day, d]));
+    const rows = [];
+    for (let day = from; day <= to; day = addDays(day, 1)) {
+      const d = byDay.get(day) ?? emptyDaily(day);
+      const elapsed = Math.min(dayEnd(day, cfg.tz), live) - dayStart(day, cfg.tz);
+      rows.push({ ...d, missing_min: Math.max(0, Math.round(elapsed / 60) - d.samples * 5) });
+    }
     return json({ from, to, rows });
   }
 
@@ -118,6 +124,10 @@ export async function handleApi(request: Request, env: Env, cfg: Config): Promis
   }
 
   return json({ error: "not found" }, 404);
+}
+
+function emptyDaily(day: string): Daily {
+  return { day, pv_kwh: 0, load_kwh: 0, import_peak_kwh: 0, import_offpeak_kwh: 0, export_kwh: 0, batt_charge_kwh: 0, batt_discharge_kwh: 0, soc_min: null, soc_max: null, samples: 0 };
 }
 
 // Consecutive tariff zone segments covering [start, end), for shading the day chart.

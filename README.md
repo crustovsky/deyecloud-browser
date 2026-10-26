@@ -155,7 +155,7 @@ Deye Cloud OpenAPI  <--  Worker (cron every 5 min)  -->  D1 (readings, daily, me
 
 **Time.** Readings are keyed by the unix timestamp Deye sends, so the clock change does not duplicate or drop anything: the day DST ends is simply 25 hours long on the chart and in the totals, and the hour that repeats on the wall clock is two distinct hours of samples. Only tariff zones and day boundaries use local time.
 
-**Gaps.** Deye's own charts draw a line through missing frames. Here a stretch of more than 10 minutes without a sample is a gap: the Day page shades it grey and breaks the lines, and `/api/day` returns it under `gaps`. The Totals table shows how many minutes of each day are missing, so days with an outage, an inverter switched off or a logger that lost Wi-Fi stand out.
+**Gaps.** Deye's own charts draw a line through missing frames. Here every missing 5 minute frame is a gap: the Day page shades it grey and breaks the lines, and `/api/day` returns it under `gaps`. The Totals table shows how many minutes of each day are missing, so days with an outage, an inverter switched off or a logger that lost Wi-Fi stand out. A frame or two a day is normal for the logger.
 
 **Rate limits.** On HTTP 429 or 5xx the run stops, honours `Retry-After` or backs off exponentially up to 30 minutes, and the next cron resumes. The Worker counts API calls per day and keeps any rate limit headers it sees; both show at `/api/status`. Deye's preliminary policy is 100,000 calls a month and 60 a minute; the 5 minute cron uses about 9,000.
 

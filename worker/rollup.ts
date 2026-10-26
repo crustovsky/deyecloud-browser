@@ -86,17 +86,20 @@ export interface Gap {
   end: number;
 }
 
-// Stretches of [start, end) longer than MAX_GAP_S with no sample: outages of the
-// logger, the inverter or Deye's cloud. `rows` must be sorted by ts ascending.
+// Stretches of [start, end) with no sample, down to a single missed 5 minute frame:
+// hiccups of the logger, the inverter or Deye's cloud. Frames sit on a 5 minute grid,
+// the half-frame slack absorbs jitter. `rows` must be sorted by ts ascending.
+const GAP_MIN_S = NOMINAL_GAP_S * 1.5;
+
 export function findGaps(rows: Reading[], start: number, end: number): Gap[] {
   const out: Gap[] = [];
   let prev = start - NOMINAL_GAP_S;
   for (const r of rows) {
     if (r.ts < start) continue;
     if (r.ts >= end) break;
-    if (r.ts - prev > MAX_GAP_S) out.push({ start: prev + NOMINAL_GAP_S, end: r.ts });
+    if (r.ts - prev > GAP_MIN_S) out.push({ start: prev + NOMINAL_GAP_S, end: r.ts });
     prev = r.ts;
   }
-  if (end - prev > MAX_GAP_S) out.push({ start: prev + NOMINAL_GAP_S, end });
+  if (end - prev > GAP_MIN_S) out.push({ start: prev + NOMINAL_GAP_S, end });
   return out;
 }

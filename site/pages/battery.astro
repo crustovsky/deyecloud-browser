@@ -72,7 +72,8 @@ import Base from "../layouts/Base.astro";
     setQs({ from, to });
     fromEl.value = from;
     toEl.value = to;
-    const { rows } = await api<{ rows: Daily[] }>(`/api/daily?from=${from}&to=${to}`);
+    const { rows: days } = await api<{ rows: Daily[] }>(`/api/daily?from=${from}&to=${to}`); // one row per day
+    const rows = days.filter((d) => d.samples > 0);
 
     barChart(document.getElementById("throughput")!, {
       labels: rows.map((d) => d.day),

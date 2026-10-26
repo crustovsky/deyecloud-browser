@@ -17,6 +17,7 @@ import Base from "../layouts/Base.astro";
       <span style="--c: var(--grid)">Grid (+ import, − export)</span>
       <span style="--c: var(--battery)">Battery (+ discharge, − charge)</span>
       <span style="--c: var(--peak-shade); outline: 1px solid var(--border)">Peak tariff hours</span>
+      <span style="--c: var(--gap-shade); outline: 1px solid var(--border)">No data</span>
     </div>
     <div id="power"></div>
     <div id="soc" style="margin-top: 6px"></div>
@@ -26,15 +27,16 @@ import Base from "../layouts/Base.astro";
 
 <script>
   import { api, addDays, cssVar, kwh, qs, setQs, todayIn, type AppConfig, type Daily, type Reading } from "../lib/api";
-  import { uPlot, axisStyle, fitWidth, tzDate, zoneShading, type Segment } from "../lib/charts";
+  import { uPlot, axisStyle, fitWidth, shading, tzDate, type Band, type Segment } from "../lib/charts";
 
-  interface DayResponse { day: string; start: number; end: number; rows: Reading[]; daily: Daily | null; zones: Segment[] }
+  interface Gap { start: number; end: number }
+  interface DayResponse { day: string; start: number; end: number; rows: Reading[]; daily: Daily | null; zones: Segment[]; gaps: Gap[] }
 
   const cfg = await api<AppConfig>("/api/config");
   const dateEl = document.getElementById("date") as HTMLInputElement;
   const powerEl = document.getElementById("power")!;
   const socEl = document.getElementById("soc")!;
-  let segments: Segment[] = [];
+  let bands: Band[] = [];
 
   const series = (label: string, color: string, extra: Partial<uPlot.Series> = {}): uPlot.Series => ({
     label,
@@ -54,7 +56,7 @@ import Base from "../layouts/Base.astro";
     axes: [axisStyle(), { ...axisStyle(), size: 54 }],
     scales: { x: { time: true } },
     series: [{ label: "Time", value: (_u, v) => (v == null ? "" : uPlot.fmtDate("{HH}:{mm}")(tzDate(cfg.timezone)(v))) }],
-    plugins: [zoneShading(() => segments)],
+    plugins: [shading(() => bands)],
   });
 
   const power = new uPlot(
@@ -93,14 +95,23 @@ import Base from "../layouts/Base.astro";
     setQs({ date: day });
     dateEl.value = day;
     const d = await api<DayResponse>(`/api/day?date=${day}`);
-    segments = d.zones;
-    const ts = d.rows.map((r) => r.ts);
-    power.setData([ts, d.rows.map((r) => r.pv_kw), d.rows.map((r) => r.load_kw), d.rows.map((r) => r.grid_kw), d.rows.map((r) => r.battery_kw)]);
-    soc.setData([ts, d.rows.map((r) => r.soc)]);
+    bands = [
+      ...d.zones.filter((z) => z.zone === "peak").map((z) => ({ ...z, color: cssVar("--peak-shade") })),
+      ...d.gaps.map((g) => ({ ...g, color: cssVar("--gap-shade") })),
+    ];
+    // A null point at the start of each gap breaks the line, so outages are not drawn through.
+    const rows = [...d.rows, ...d.gaps.map((g) => ({ ts: g.start, pv_kw: null, load_kw: null, grid_kw: null, battery_kw: null, soc: null }))].sort((a, b) => a.ts - b.ts);
+    const ts = rows.map((r) => r.ts);
+    power.setData([ts, rows.map((r) => r.pv_kw), rows.map((r) => r.load_kw), rows.map((r) => r.grid_kw), rows.map((r) => r.battery_kw)]);
+    soc.setData([ts, rows.map((r) => r.soc)]);
     power.setScale("x", { min: d.start, max: d.end });
     soc.setScale("x", { min: d.start, max: d.end });
 
-    document.getElementById("info")!.textContent = d.rows.length ? `${d.rows.length} samples` : "no data for this day";
+    const hhmm = (t: number) => uPlot.fmtDate("{HH}:{mm}")(tzDate(cfg.timezone)(t));
+    const missing = d.gaps.map((g) => `${hhmm(g.start)}–${hhmm(g.end)}`).join(", ");
+    document.getElementById("info")!.textContent = d.rows.length
+      ? `${d.rows.length} samples${missing ? ` · no data ${missing}` : ""}`
+      : "no data for this day";
     const t = d.daily;
     document.getElementById("totals")!.innerHTML = t
       ? [

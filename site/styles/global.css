@@ -16,6 +16,7 @@
   --soc: #6250d6;
   --track: #e9e8e4;
   --peak-shade: rgba(235, 104, 52, 0.07);
+  --gap-shade: rgba(120, 120, 120, 0.22);
   --good: #008300;
   --warn: #c98500;
 }
@@ -38,6 +39,7 @@
     --soc: #9085e9;
     --track: #33332f;
     --peak-shade: rgba(217, 89, 38, 0.12);
+    --gap-shade: rgba(200, 200, 200, 0.18);
     --good: #4fbf4f;
     --warn: #e0a030;
   }

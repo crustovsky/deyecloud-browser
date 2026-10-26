@@ -3,7 +3,7 @@
 import type { Config } from "./config";
 import { allMeta, getMetaJson } from "./meta";
 import { lastRun, rollupAndStore, runIngest } from "./ingest";
-import type { Reading } from "./rollup";
+import { findGaps, type Daily, type Reading } from "./rollup";
 import { addDays, dayEnd, dayStart, isDay, localDay, zoneFor, type Zone } from "./time";
 
 const MANUAL_MIN_GAP_S = 60;
@@ -73,7 +73,8 @@ export async function handleApi(request: Request, env: Env, cfg: Config): Promis
       .bind(start, end)
       .all<Reading>();
     const daily = await db.prepare("SELECT * FROM daily WHERE day = ?").bind(day).first();
-    return json({ day, start, end, rows: results, daily, zones: zoneSegments(start, end, cfg) });
+    const gaps = findGaps(results, start, Math.min(end, now));
+    return json({ day, start, end, rows: results, daily, zones: zoneSegments(start, end, cfg), gaps });
   }
 
   if (request.method === "GET" && path === "/api/daily") {
@@ -84,8 +85,13 @@ export async function handleApi(request: Request, env: Env, cfg: Config): Promis
     const { results } = await db
       .prepare("SELECT * FROM daily WHERE day >= ? AND day <= ? ORDER BY day")
       .bind(from, to)
-      .all();
-    return json({ from, to, rows: results });
+      .all<Daily>();
+    // Minutes of the day (so far) not covered by a 5 minute sample. DST days are 23 or 25 hours.
+    const rows = results.map((d) => {
+      const elapsed = Math.min(dayEnd(d.day, cfg.tz), now) - dayStart(d.day, cfg.tz);
+      return { ...d, missing_min: Math.max(0, Math.round(elapsed / 60) - d.samples * 5) };
+    });
+    return json({ from, to, rows });
   }
 
   if (request.method === "POST" && path === "/api/ingest") {

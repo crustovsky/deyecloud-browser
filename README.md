@@ -7,8 +7,8 @@ A small, self-hosted energy dashboard for Deye hybrid inverters. A Cloudflare Wo
 ![Live power flow](docs/live.png)
 
 - **Live**: four gauges (solar, grid, battery, house) with animated flow wires, in the style of the inverter's own panel, today's totals and a Fetch now button
-- **Day**: PV, house, grid and battery power for any day, state of charge underneath, peak tariff hours shaded
-- **Totals**: energy per day, grid import split into peak and off-peak hours, self-sufficiency, and a table with every number
+- **Day**: PV, house, grid and battery power for any day, state of charge underneath, peak tariff hours shaded, outages shown as grey bands instead of being drawn through
+- **Totals**: energy per day, grid import split into peak and off-peak hours, self-sufficiency, and a table with every number, including how long each day went without data
 - **Battery**: daily charge and discharge, round trip, lowest state of charge per day
 - Private by default: only visitors authenticated by [Cloudflare Access](https://developers.cloudflare.com/workers/configuration/cloudflare-access/) see anything
 - Light and dark mode, works on a phone
@@ -152,6 +152,10 @@ Deye Cloud OpenAPI  <--  Worker (cron every 5 min)  -->  D1 (readings, daily, me
 **Ingest.** One function serves the cron, the Fetch now button and the initial backfill. A cursor in the `meta` table records how far history has been fetched. Each run asks `station/history/power` for the window from one hour before the cursor (so frames that Deye fills in late are caught) to at most one day ahead, upserts the frames on their timestamp, moves the cursor and repeats a few times. An empty database starts the cursor at `BACKFILL_FROM`. The same loop therefore handles the first fill, catching up after an outage and the normal 5 minute increment.
 
 **Daily totals.** Energy is integrated in the Worker from the 5 minute samples: kW × gap to the next sample, with gaps capped at 10 minutes so outages do not inflate totals. Each sample's tariff zone comes from its local hour in `TIMEZONE`, so daylight saving changes are handled. Totals are recomputed for every day a run touched.
+
+**Time.** Readings are keyed by the unix timestamp Deye sends, so the clock change does not duplicate or drop anything: the day DST ends is simply 25 hours long on the chart and in the totals, and the hour that repeats on the wall clock is two distinct hours of samples. Only tariff zones and day boundaries use local time.
+
+**Gaps.** Deye's own charts draw a line through missing frames. Here a stretch of more than 10 minutes without a sample is a gap: the Day page shades it grey and breaks the lines, and `/api/day` returns it under `gaps`. The Totals table shows how many minutes of each day are missing, so days with an outage, an inverter switched off or a logger that lost Wi-Fi stand out.
 
 **Rate limits.** On HTTP 429 or 5xx the run stops, honours `Retry-After` or backs off exponentially up to 30 minutes, and the next cron resumes. The Worker counts API calls per day and keeps any rate limit headers it sees; both show at `/api/status`. Deye's preliminary policy is 100,000 calls a month and 60 a minute; the 5 minute cron uses about 9,000.
 

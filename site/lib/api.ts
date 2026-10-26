@@ -19,6 +19,7 @@ export interface Daily {
   soc_min: number | null;
   soc_max: number | null;
   samples: number;
+  missing_min?: number; // minutes of the day without a sample, from /api/daily
 }
 
 export interface AppConfig {

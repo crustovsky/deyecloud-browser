@@ -86,10 +86,12 @@ export interface Gap {
   end: number;
 }
 
-// Stretches of [start, end) with no sample, down to a single missed 5 minute frame:
-// hiccups of the logger, the inverter or Deye's cloud. Frames sit on a 5 minute grid,
-// the half-frame slack absorbs jitter. `rows` must be sorted by ts ascending.
-const GAP_MIN_S = NOMINAL_GAP_S * 1.5;
+// Stretches of [start, end) missing two or more consecutive frames: outages of the
+// logger, the inverter or Deye's cloud. A single missed frame is left out on purpose:
+// the logger's upload cycle runs a few seconds long, so about every three hours one
+// upload slides into the next slot and leaves an empty one. Those still count in the
+// daily missing minutes. `rows` must be sorted by ts ascending.
+const GAP_MIN_S = MAX_GAP_S;
 
 export function findGaps(rows: Reading[], start: number, end: number): Gap[] {
   const out: Gap[] = [];

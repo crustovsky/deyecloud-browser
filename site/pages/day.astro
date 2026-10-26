@@ -47,15 +47,18 @@ import Base from "../layouts/Base.astro";
     ...extra,
   });
 
+  const hhmm = (t: number) => uPlot.fmtDate("{HH}:{mm}")(tzDate(cfg.timezone)(t));
+  const timeAxis = (): uPlot.Axis => ({ ...axisStyle(), values: (_u, vals) => vals.map(hhmm) });
+
   const base = (height: number): uPlot.Options => ({
     width: powerEl.clientWidth,
     height,
     tzDate: tzDate(cfg.timezone),
     cursor: { sync: { key: "day" }, points: { size: 8 } },
     legend: { live: true },
-    axes: [axisStyle(), { ...axisStyle(), size: 54 }],
+    axes: [timeAxis(), { ...axisStyle(), size: 54 }],
     scales: { x: { time: true } },
-    series: [{ label: "Time", value: (_u, v) => (v == null ? "" : uPlot.fmtDate("{HH}:{mm}")(tzDate(cfg.timezone)(v))) }],
+    series: [{ label: "Time", value: (_u, v) => (v == null ? "" : hhmm(v)) }],
     plugins: [shading(() => bands)],
   });
 
@@ -69,7 +72,7 @@ import Base from "../layouts/Base.astro";
         series("Grid", "--grid"),
         series("Battery", "--battery"),
       ],
-      axes: [axisStyle(), { ...axisStyle(), size: 54, values: (_u, vals) => vals.map((v) => `${v} kW`) }],
+      axes: [timeAxis(), { ...axisStyle(), size: 54, values: (_u, vals) => vals.map((v) => `${v} kW`) }],
     },
     [[], [], [], [], []],
     powerEl,
@@ -79,7 +82,7 @@ import Base from "../layouts/Base.astro";
     {
       ...base(130),
       series: [...base(0).series, series("SOC", "--soc", { value: (_u, v) => (v == null ? "–" : `${v.toFixed(0)} %`), fill: cssVar("--soc") + "22" })],
-      axes: [axisStyle(), { ...axisStyle(), size: 54, values: (_u, vals) => vals.map((v) => `${v} %`) }],
+      axes: [timeAxis(), { ...axisStyle(), size: 54, values: (_u, vals) => vals.map((v) => `${v} %`) }],
       scales: { x: { time: true }, y: { range: [0, 100] } },
     },
     [[], []],
@@ -108,7 +111,6 @@ import Base from "../layouts/Base.astro";
     soc.setScale("x", { min: d.start, max: d.end });
 
     // A few gaps are listed; many are summed up, with the list on hover. The bands show where they are.
-    const hhmm = (t: number) => uPlot.fmtDate("{HH}:{mm}")(tzDate(cfg.timezone)(t));
     const list = d.gaps.map((g) => `${hhmm(g.start)}–${hhmm(g.end)}`).join(", ");
     const minutes = d.gaps.reduce((s, g) => s + (g.end - g.start) / 60, 0);
     const missing = d.gaps.length > 3 ? `${duration(Math.round(minutes))} in ${d.gaps.length} gaps` : list;

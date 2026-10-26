@@ -122,9 +122,13 @@ describe("findGaps", () => {
       { start: start + 45 * 60, end },
     ]);
   });
-  it("tolerates a single missing frame", () => {
+  it("reports a single missing frame", () => {
     const rows = [row(0, {}), row(10, {}), row(15, {})];
-    expect(findGaps(rows, start, start + 20 * 60)).toEqual([]);
+    expect(findGaps(rows, start, start + 20 * 60)).toEqual([{ start: start + 5 * 60, end: start + 10 * 60 }]);
+  });
+  it("ignores timestamp jitter", () => {
+    const rows = [row(0, {}), row(5.5, {}), row(10, {})];
+    expect(findGaps(rows, start, start + 15 * 60)).toEqual([]);
   });
   it("whole range empty is one gap", () => {
     expect(findGaps([], start, end)).toEqual([{ start, end }]);

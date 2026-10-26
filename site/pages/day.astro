@@ -26,7 +26,7 @@ import Base from "../layouts/Base.astro";
 </Base>
 
 <script>
-  import { api, addDays, cssVar, kwh, qs, setQs, todayIn, type AppConfig, type Daily, type Reading } from "../lib/api";
+  import { api, addDays, cssVar, duration, kwh, qs, setQs, todayIn, type AppConfig, type Daily, type Reading } from "../lib/api";
   import { uPlot, axisStyle, fitWidth, shading, tzDate, type Band, type Segment } from "../lib/charts";
 
   interface Gap { start: number; end: number }
@@ -107,11 +107,14 @@ import Base from "../layouts/Base.astro";
     power.setScale("x", { min: d.start, max: d.end });
     soc.setScale("x", { min: d.start, max: d.end });
 
+    // A few gaps are listed; many are summed up, with the list on hover. The bands show where they are.
     const hhmm = (t: number) => uPlot.fmtDate("{HH}:{mm}")(tzDate(cfg.timezone)(t));
-    const missing = d.gaps.map((g) => `${hhmm(g.start)}–${hhmm(g.end)}`).join(", ");
-    document.getElementById("info")!.textContent = d.rows.length
-      ? `${d.rows.length} samples${missing ? ` · no data ${missing}` : ""}`
-      : "no data for this day";
+    const list = d.gaps.map((g) => `${hhmm(g.start)}–${hhmm(g.end)}`).join(", ");
+    const minutes = d.gaps.reduce((s, g) => s + (g.end - g.start) / 60, 0);
+    const missing = d.gaps.length > 3 ? `${duration(Math.round(minutes))} in ${d.gaps.length} gaps` : list;
+    const info = document.getElementById("info")!;
+    info.textContent = d.rows.length ? `${d.rows.length} samples${missing ? ` · no data ${missing}` : ""}` : "no data for this day";
+    info.title = list;
     const t = d.daily;
     document.getElementById("totals")!.innerHTML = t
       ? [

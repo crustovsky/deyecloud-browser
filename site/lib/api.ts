@@ -50,6 +50,11 @@ export function kwh(v: number | null | undefined): string {
   return v == null ? "–" : v.toFixed(1);
 }
 
+// 75 -> "1 h 15 min", 20 -> "20 min"
+export function duration(min: number): string {
+  return min >= 60 ? `${Math.floor(min / 60)} h ${String(min % 60).padStart(2, "0")} min` : `${min} min`;
+}
+
 export function timeAgo(ts: number, now = Math.floor(Date.now() / 1000)): string {
   const s = Math.max(0, now - ts);
   if (s < 90) return "just now";

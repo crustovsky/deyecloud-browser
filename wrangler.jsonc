@@ -32,7 +32,6 @@
     "OFFPEAK_HOURS": "22-6,13-15",
     "GAUGE_PV_KW": "5",
     "GAUGE_GRID_KW": "12",
-    "GAUGE_BATTERY_KW": "5",
     "GAUGE_LOAD_KW": "12"
   },
   // Secrets, set with `wrangler secret put` or in the dashboard:

@@ -109,7 +109,6 @@ Variables in `wrangler.jsonc`, in your `wrangler.local.jsonc`, or on the Worker'
 | `OFFPEAK_HOURS`    | `22-6,13-15`                          | Cheap tariff hours in local time, `start-end` ranges separated by commas, ranges may wrap midnight. Empty means a flat tariff (everything counts as peak). |
 | `GAUGE_PV_KW`      | `5`                                   | Full scale of the solar gauge, usually the array size in kWp. |
 | `GAUGE_GRID_KW`    | `12`                                  | Full scale of the grid gauge. |
-| `GAUGE_BATTERY_KW` | `5`                                   | Full scale of the battery gauge. |
 | `GAUGE_LOAD_KW`    | `12`                                  | Full scale of the house gauge. |
 
 Secrets: `DEYE_APP_ID`, `DEYE_APP_SECRET`, `DEYE_EMAIL`, `DEYE_PASSWORD`. They live on the deployed Worker (`wrangler secret put` or the dashboard). The same four names in a local `.dev.vars` file serve only `npm run dev` and `npm run probe` on your machine and are never uploaded.

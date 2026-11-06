@@ -12,7 +12,7 @@ export interface Config {
   powerUnit: "W" | "kW";
   stationName: string;
   backfillFrom: string; // YYYY-MM-DD or ""
-  gauges: { pv: number; grid: number; battery: number; load: number };
+  gauges: { pv: number; grid: number; load: number };
   allowPublic: boolean;
 }
 
@@ -52,7 +52,6 @@ export function loadConfig(env: Env): Config {
     gauges: {
       pv: kw(env.GAUGE_PV_KW, 5),
       grid: kw(env.GAUGE_GRID_KW, 12),
-      battery: kw(env.GAUGE_BATTERY_KW, 5),
       load: kw(env.GAUGE_LOAD_KW, 12),
     },
     allowPublic: String(env.ALLOW_PUBLIC) === "true",

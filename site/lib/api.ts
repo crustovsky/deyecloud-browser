@@ -27,7 +27,7 @@ export interface AppConfig {
   stationName: string;
   timezone: string;
   offpeak: { start: number; end: number }[];
-  gauges: { pv: number; grid: number; battery: number; load: number };
+  gauges: { pv: number; grid: number; load: number };
 }
 
 export async function api<T = unknown>(path: string, init?: RequestInit): Promise<T> {

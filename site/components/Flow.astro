@@ -1,6 +1,8 @@
 ---
 // Four arc gauges (solar, grid, battery, house) joined by dotted wires, in the
 // style of the inverter's own panel. Built in the browser from /api/latest.
+// Every gauge reads in kW. The arc is that power against the gauge's full
+// scale, except on the battery, where it is the state of charge.
 ---
 <div id="flow" class="card flow"></div>
 
@@ -71,7 +73,7 @@
         <text class="value" id="val-${key}" x="${n.cx}" y="${n.cy + 36}" text-anchor="middle">–</text>
         <text class="unit" x="${n.cx}" y="${n.cy + 50}" text-anchor="middle">kW</text>
         <text class="tick" x="${x0 - 2}" y="${y0 + 14}" text-anchor="middle">0</text>
-        <text class="tick" id="max-${key}" x="${x1 + 2}" y="${y1 + 14}" text-anchor="middle"></text>
+        <text class="tick" id="max-${key}" x="${x1 + 2}" y="${y1 + 14}" text-anchor="middle">${key === "battery" ? "100%" : ""}</text>
         <text class="name" id="name-${key}" x="${n.cx}" y="${n.cy + R + 30}" text-anchor="middle">${n.name}</text>
       </g>`;
   }
@@ -116,16 +118,15 @@
   root.innerHTML = `<svg viewBox="0 0 640 430" role="img" aria-label="Power flow">${wires()}${inverter()}${(Object.keys(NODES) as Key[]).map(gauge).join("")}</svg>`;
 
   const $ = (id: string) => document.getElementById(id)!;
-  let gauges = { pv: 5, grid: 12, battery: 5, load: 12 };
+  let gauges = { pv: 5, grid: 12, load: 12 };
 
-  function setGauge(key: Key, value: number | null) {
-    const v = Math.abs(value ?? 0);
-    const frac = Math.min(1, v / gauges[key]);
+  // kw is the number under the icon, level (0..1) how much of the arc is filled.
+  function setGauge(key: Key, kw: number | null, level: number) {
+    const frac = Math.max(0, Math.min(1, level));
     const fill = $(`fill-${key}`);
     fill.setAttribute("stroke-dasharray", `${(frac * ARC_LEN).toFixed(1)} ${ARC_LEN.toFixed(1)}`);
     fill.style.opacity = frac > 0.002 ? "1" : "0"; // a zero-length dash still draws its round cap
-    $(`val-${key}`).textContent = value == null ? "–" : v.toFixed(2);
-    $(`max-${key}`).textContent = String(gauges[key]);
+    $(`val-${key}`).textContent = kw == null ? "–" : Math.abs(kw).toFixed(2);
   }
 
   function setWire(key: Key, dir: "fwd" | "rev" | "idle") {
@@ -137,15 +138,16 @@
   const EPS = 0.03;
 
   function render(r: Reading | null) {
-    setGauge("pv", r?.pv_kw ?? null);
-    setGauge("grid", r?.grid_kw ?? null);
-    setGauge("battery", r?.battery_kw ?? null);
-    setGauge("load", r?.load_kw ?? null);
-
     const pv = r?.pv_kw ?? 0;
     const grid = r?.grid_kw ?? 0;
     const batt = r?.battery_kw ?? 0;
     const load = r?.load_kw ?? 0;
+    const soc = r?.soc;
+
+    setGauge("pv", r?.pv_kw ?? null, pv / gauges.pv);
+    setGauge("grid", r?.grid_kw ?? null, Math.abs(grid) / gauges.grid);
+    setGauge("battery", r?.battery_kw ?? null, (soc ?? 0) / 100);
+    setGauge("load", r?.load_kw ?? null, load / gauges.load);
 
     setWire("pv", pv > EPS ? "fwd" : "idle");
     setWire("load", load > EPS ? "rev" : "idle");
@@ -155,7 +157,6 @@
     $("name-grid").textContent = grid > EPS ? "Grid · importing" : grid < -EPS ? "Grid · exporting" : "Grid";
     $("name-battery").textContent = batt > EPS ? "Battery · discharging" : batt < -EPS ? "Battery · charging" : "Battery";
 
-    const soc = r?.soc;
     $("soc").textContent = soc == null ? "" : `${Math.round(soc)}%`;
     $("batt-fill").setAttribute("width", String(Math.max(0, Math.min(14, (14 * (soc ?? 0)) / 100))));
     $("batt-fill").setAttribute("fill", soc != null && soc < 20 ? cssVar("--grid") : cssVar("--battery"));
@@ -173,6 +174,7 @@
 
   api<AppConfig>("/api/config").then((c) => {
     gauges = c.gauges;
+    for (const key of ["pv", "grid", "load"] as const) $(`max-${key}`).textContent = String(gauges[key]);
     return refresh();
   });
   setInterval(refresh, 60_000);
